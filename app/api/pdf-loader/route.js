@@ -2,8 +2,13 @@ import { NextResponse } from "next/server";
 import { WebPDFLoader } from "@langchain/community/document_loaders/web/pdf";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 
-const pdfUrl="https://giant-dodo-170.convex.cloud/api/storage/5787a5c7-343d-483f-be17-33f40721459d"
+
 export async function GET(req) {
+
+    const reqUrl=req.url;
+    const {searchParams}=new URL(reqUrl);
+    const pdfUrl=searchParams.get('pdfUrl');
+    console.log(pdfUrl);
 
     // Load the PDF file
     const response = await fetch(pdfUrl);

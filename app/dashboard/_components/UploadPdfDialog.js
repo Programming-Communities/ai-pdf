@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useMutation } from "convex/react";
+import { useAction, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Loader2Icon } from "lucide-react";
 import uuid4 from "uuid4";
@@ -23,6 +23,7 @@ function UploadPdfDialog({ children }) {
   const generateUploadUrl = useMutation(api.fileStorage.generateUploadUrl);
   const addFileEntry = useMutation(api.fileStorage.AddFileEntryToDb);
   const getFileUrl = useMutation(api.fileStorage.getFileUrl);
+  const embeddDocument = useAction(api.myAction.ingest);
 
   const user = {
     primaryEmailAddress: { emailAddress: "user@example.com" },
@@ -31,6 +32,7 @@ function UploadPdfDialog({ children }) {
   const [file, setFile] = useState();
   const [loading, setLoading] = useState(false);
   const [fileName, setFileName] = useState("");
+  const [open,setOpen]=useState(false);
 
   const onFileSelect = (event) => {
     setFile(event.target.files[0]);
@@ -70,9 +72,16 @@ function UploadPdfDialog({ children }) {
 
       console.log("File successfully uploaded:", resp);
 
-      const ApiResp = await axios.get("/api/pdf-loader");
+      const ApiResp = await axios.get("/api/pdf-loader?pdfUrl=" + fileUrl);
       if (ApiResp?.data?.Result) {
         console.log("Processed PDF content:", ApiResp.data.Result);
+
+        const embeddedDocumentResponse = await embeddDocument({
+          splitText: ApiResp.data.Result,
+          fileId: fileId,
+        });
+
+        console.log("Document embedded successfully:", embeddedDocumentResponse);
       } else {
         console.error("Unexpected API response:", ApiResp.data);
       }
@@ -80,12 +89,15 @@ function UploadPdfDialog({ children }) {
       console.error("Upload error:", error);
     } finally {
       setLoading(false);
+      setOpen(false);
     }
   };
 
   return (
-    <Dialog>
-      <DialogTrigger asChild>{children}</DialogTrigger>
+    <Dialog open={open}>
+      <DialogTrigger asChild>
+        <Button onClick={()=>setOpen(true)}className='w-full flex gap-2 mt-5 '>+Upload PDF File</Button>
+        </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Upload PDF File</DialogTitle>
@@ -128,9 +140,11 @@ function UploadPdfDialog({ children }) {
 export default UploadPdfDialog;
 
 
+
 // "use client";
 
 // import React, { useState } from "react";
+// import axios from "axios";
 // import {
 //   Dialog,
 //   DialogClose,
@@ -143,19 +157,17 @@ export default UploadPdfDialog;
 // } from "@/components/ui/dialog";
 // import { Input } from "@/components/ui/input";
 // import { Button } from "@/components/ui/button";
-// import { useMutation } from "convex/react"; // Removed useUser
+// import { useAction, useMutation } from "convex/react";
 // import { api } from "@/convex/_generated/api";
 // import { Loader2Icon } from "lucide-react";
 // import uuid4 from "uuid4";
-// import axios from "axios";
-
 
 // function UploadPdfDialog({ children }) {
 //   const generateUploadUrl = useMutation(api.fileStorage.generateUploadUrl);
 //   const addFileEntry = useMutation(api.fileStorage.AddFileEntryToDb);
 //   const getFileUrl = useMutation(api.fileStorage.getFileUrl);
+//   const embeddDocument=useAction(api.myAction.ingest);
 
-//   // Mock user data or replace this with your actual user fetching logic
 //   const user = {
 //     primaryEmailAddress: { emailAddress: "user@example.com" },
 //   };
@@ -172,43 +184,51 @@ export default UploadPdfDialog;
 //     setLoading(true);
 
 //     try {
-//       // Step 1: Get a short-lived upload URL
+//       if (!file) {
+//         alert("Please select a file to upload.");
+//         setLoading(false);
+//         return;
+//       }
+
 //       const postUrl = await generateUploadUrl();
 
-//       // Step 2: POST the file to the URL
 //       const result = await fetch(postUrl, {
 //         method: "POST",
-//         headers: { "Content-Type": file?.type },
+//         headers: { "Content-Type": file.type },
 //         body: file,
 //       });
 
 //       const { storageId } = await result.json();
-//       console.log("storageId", storageId);
 
 //       const fileId = uuid4();
-//       const fileUrl = await getFileUrl({ storageId: storageId });
+//       const fileUrl = await getFileUrl({ storageId });
+//       const fileNameToSave = fileName || file.name || "Untitled File";
 
-//       // Step 3: Save the newly allocated storage ID to the database
 //       const resp = await addFileEntry({
-//         fileId: fileId,
-//         storageId: storageId,
-//         fileName: fileName || "Untitled File",
-//         fileUrl: fileUrl,
+//         fileId,
+//         storageId,
+//         fileName: fileNameToSave,
+//         fileUrl,
 //         createdBy: user.primaryEmailAddress.emailAddress,
 //       });
 
-//       console.log(resp);
+//       console.log("File successfully uploaded:", resp);
+
+//       const ApiResp = await axios.get("/api/pdf-loader");
+//       if (ApiResp?.data?.Result) {
+//         console.log("Processed PDF content:", ApiResp.data.Result);
+//         const embeddDocument= embeddDocument({
+//           splitText: ApiResp.data.Result,
+//           fileId:'123'
+//         })
+//       } else {
+//         console.error("Unexpected API response:", 'ApiResp.data', embeddDocument);
+//       }
 //     } catch (error) {
 //       console.error("Upload error:", error);
 //     } finally {
 //       setLoading(false);
 //     }
-    
-//     // API Call to Fetch PDF Proccess Data
-
-//     const ApiResp=await axios.get('/api/pdf-loader');
-//     console.log(ApiResp.data.result);
-
 //   };
 
 //   return (
@@ -244,7 +264,7 @@ export default UploadPdfDialog;
 //               Close
 //             </Button>
 //           </DialogClose>
-//           <Button onClick={onUpload}>
+//           <Button onClick={onUpload} disabled={loading}>
 //             {loading ? <Loader2Icon className="animate-spin" /> : "Upload"}
 //           </Button>
 //         </DialogFooter>
